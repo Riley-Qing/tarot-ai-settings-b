@@ -19,57 +19,58 @@ import {
 import type { AiSettingsSnapshot } from './types';
 
 const template = `
-  <section class="tarot-settings" aria-label="AI settings">
+  <section class="jp-TarotSettingsPanel-body" aria-label="AI settings">
     <h2>AI connection</h2>
-    <p data-region="status">Status: Loading…</p>
-    <p data-region="banner" role="status" aria-live="polite"></p>
+    <p data-settings-region="status">Status: Loading…</p>
+    <p class="jp-TarotSettingsPanel-simulated" data-settings-region="simulated" hidden>Demo (simulated). This mode does not contact an AI server.</p>
+    <p data-settings-region="banner" role="status" aria-live="polite"></p>
     <form>
-      <fieldset data-region="fields">
-        <div class="tarot-settings-choice">
-          <span id="tarot-mode-label">Mode</span>
-          <label><input type="radio" name="tarot-mode" value="real"> Real API</label>
-          <label><input type="radio" name="tarot-mode" value="demo"> Demo (simulated)</label>
+      <fieldset data-settings-region="fields">
+        <div class="jp-TarotSettingsPanel-choice">
+          <span id="tarot-settings-mode-label">Mode</span>
+          <label><input type="radio" name="tarot-settings-mode" value="real"> Real API</label>
+          <label><input type="radio" name="tarot-settings-mode" value="demo"> Demo (simulated)</label>
         </div>
         <label>Base URL
           <input name="base_url" type="url" autocomplete="off" spellcheck="false" placeholder="https://api.openai.com/v1">
         </label>
-        <p class="tarot-settings-hint" data-region="base-hint">Use the server's API base URL, not /chat/completions. 127.0.0.1 is the Jupyter server machine, not necessarily the computer running this browser.</p>
-        <p class="tarot-settings-error" data-error="base_url"></p>
+        <p class="jp-TarotSettingsPanel-hint" data-settings-region="base-hint">Use the server's API base URL, not /chat/completions. 127.0.0.1 is the Jupyter server machine, not necessarily the computer running this browser.</p>
+        <p class="jp-TarotSettingsPanel-error" data-error="base_url"></p>
         <label>Model
           <input name="model" type="text" autocomplete="off" spellcheck="false" placeholder="Enter a model ID">
         </label>
-        <p class="tarot-settings-error" data-error="model"></p>
+        <p class="jp-TarotSettingsPanel-error" data-error="model"></p>
         <label>Authentication
           <select name="auth_mode">
             <option value="bearer">Bearer API key</option>
             <option value="none">No authentication</option>
           </select>
         </label>
-        <div class="tarot-settings-key">
+        <div class="jp-TarotSettingsPanel-key">
           <label>API key
             <input name="api_key" type="password" autocomplete="off" spellcheck="false">
           </label>
-          <button type="button" data-action="show">Show</button>
+          <button type="button" data-settings-action="show">Show</button>
         </div>
-        <p data-region="key">Key: Not set</p>
-        <p class="tarot-settings-hint">Entered keys remain in server memory until it restarts. This page never stores a key in the browser.</p>
-        <p class="tarot-settings-error" data-error="api_key"></p>
-        <button type="button" data-action="clear">Clear runtime key</button>
+        <p data-settings-region="key">Key: Not set</p>
+        <p class="jp-TarotSettingsPanel-hint">Entered keys remain in server memory until it restarts. This page never stores a key in the browser.</p>
+        <p class="jp-TarotSettingsPanel-error" data-error="api_key"></p>
+        <button type="button" data-settings-action="clear">Clear runtime key</button>
         <label>Timeout (seconds)
           <input name="timeout" type="text" inputmode="numeric" autocomplete="off" spellcheck="false">
         </label>
-        <p class="tarot-settings-error" data-error="timeout_seconds"></p>
+        <p class="jp-TarotSettingsPanel-error" data-error="timeout_seconds"></p>
       </fieldset>
-      <p class="tarot-settings-hint">Testing sends a short synthetic prompt and may incur API charges.</p>
-      <div class="tarot-settings-actions">
-        <button type="button" data-action="test">Test connection</button>
-        <button type="submit" data-action="save">Save configuration</button>
-        <button type="button" data-action="cancel">Cancel</button>
+      <p class="jp-TarotSettingsPanel-hint">Testing sends a short synthetic prompt and may incur API charges.</p>
+      <div class="jp-TarotSettingsPanel-actions">
+        <button type="button" data-settings-action="test">Test connection</button>
+        <button type="submit" data-settings-action="save">Save configuration</button>
+        <button type="button" data-settings-action="cancel">Cancel</button>
       </div>
     </form>
     <p>Your question and card details are sent to the configured AI server only when you request a real reading.</p>
     <p>For entertainment and self-reflection only.</p>
-    <p><button type="button" data-action="reload">Load saved configuration</button></p>
+    <p><button type="button" data-settings-action="reload">Load saved configuration</button></p>
   </section>
 `;
 
@@ -92,6 +93,7 @@ export class TarotSettingsPanel extends Widget {
   private readonly form: HTMLFormElement;
   private readonly fields: HTMLFieldSetElement;
   private readonly status: HTMLElement;
+  private readonly simulated: HTMLElement;
   private readonly banner: HTMLElement;
   private readonly keyStatus: HTMLElement;
   private readonly baseHint: HTMLElement;
@@ -119,26 +121,27 @@ export class TarotSettingsPanel extends Widget {
     private readonly options: TarotSettingsPanelOptions = {}
   ) {
     super();
-    this.addClass('tarot-settings-host');
+    this.addClass('jp-TarotSettingsPanel');
     this.node.innerHTML = template;
     this.form = this.node.querySelector('form')!;
-    this.fields = this.node.querySelector('[data-region="fields"]')!;
-    this.status = this.node.querySelector('[data-region="status"]')!;
-    this.banner = this.node.querySelector('[data-region="banner"]')!;
-    this.keyStatus = this.node.querySelector('[data-region="key"]')!;
-    this.baseHint = this.node.querySelector('[data-region="base-hint"]')!;
-    this.modeInputs = this.node.querySelectorAll('input[name="tarot-mode"]');
+    this.fields = this.node.querySelector('[data-settings-region="fields"]')!;
+    this.status = this.node.querySelector('[data-settings-region="status"]')!;
+    this.simulated = this.node.querySelector('[data-settings-region="simulated"]')!;
+    this.banner = this.node.querySelector('[data-settings-region="banner"]')!;
+    this.keyStatus = this.node.querySelector('[data-settings-region="key"]')!;
+    this.baseHint = this.node.querySelector('[data-settings-region="base-hint"]')!;
+    this.modeInputs = this.node.querySelectorAll('input[name="tarot-settings-mode"]');
     this.baseUrl = this.node.querySelector('input[name="base_url"]')!;
     this.model = this.node.querySelector('input[name="model"]')!;
     this.authMode = this.node.querySelector('select[name="auth_mode"]')!;
     this.apiKey = this.node.querySelector('input[name="api_key"]')!;
     this.timeout = this.node.querySelector('input[name="timeout"]')!;
-    this.showButton = this.node.querySelector('[data-action="show"]')!;
-    this.clearButton = this.node.querySelector('[data-action="clear"]')!;
-    this.testButton = this.node.querySelector('[data-action="test"]')!;
-    this.saveButton = this.node.querySelector('[data-action="save"]')!;
-    this.cancelButton = this.node.querySelector('[data-action="cancel"]')!;
-    this.reloadButton = this.node.querySelector('[data-action="reload"]')!;
+    this.showButton = this.node.querySelector('[data-settings-action="show"]')!;
+    this.clearButton = this.node.querySelector('[data-settings-action="clear"]')!;
+    this.testButton = this.node.querySelector('[data-settings-action="test"]')!;
+    this.saveButton = this.node.querySelector('[data-settings-action="save"]')!;
+    this.cancelButton = this.node.querySelector('[data-settings-action="cancel"]')!;
+    this.reloadButton = this.node.querySelector('[data-settings-action="reload"]')!;
 
     this.form.addEventListener('submit', event => {
       event.preventDefault();
@@ -363,13 +366,18 @@ export class TarotSettingsPanel extends Widget {
     this.node.setAttribute('aria-busy', this.busy ? 'true' : 'false');
     this.reloadButton.disabled = this.busy;
     if (snapshot === null || draft === null) {
+      this.status.textContent = 'Status: Unknown';
+      this.simulated.hidden = true;
       this.testButton.disabled = true;
       this.saveButton.disabled = true;
       this.cancelButton.disabled = true;
       return;
     }
 
-    this.status.textContent = `Status: ${statusLabel(snapshot.status)}`;
+    this.simulated.hidden = draft.mode !== 'demo';
+    this.status.textContent = draft.mode === 'demo'
+      ? 'Status: Demo (simulated)'
+      : `Status: ${statusLabel(snapshot.status)}`;
     for (const input of this.modeInputs) {
       input.checked = input.value === draft.mode;
       input.disabled = locked || isFieldLocked(snapshot, 'mode');
