@@ -16,6 +16,7 @@ type ErrorResponse = { error?: { code: string; message: string } };
 /**
  * Structured Tarot API error. `status` is the HTTP status.
  * Jupyter auth failures that are not JSON use code `SESSION_EXPIRED`.
+ * A failed `fetch` uses code `NETWORK_ERROR`.
  */
 export class TarotRequestError extends Error {
   readonly status: number;
@@ -93,7 +94,7 @@ export class TarotClient {
     try {
       response = await ServerConnection.makeRequest(url, init, this.settings);
     } catch {
-      throw new TarotRequestError(0, 'SESSION_EXPIRED', 'Could not reach Tarot. Check your Jupyter session and try again.');
+      throw new TarotRequestError(0, 'NETWORK_ERROR', 'Could not reach Tarot. Check the network and try again.');
     }
     const data = await response.json().catch(() => null) as (T & ErrorResponse) | null;
     if (!response.ok || data === null) {
