@@ -13,14 +13,16 @@ export function normalizeBaseUrl(value: string): string {
     return trimmed;
   }
   let path = url.pathname;
-  if (path.length > 1 && path.endsWith('/')) {
+  if (path === '/') {
+    path = '';
+  } else if (path.endsWith('/')) {
     path = path.slice(0, -1);
   }
   return `${url.protocol}//${url.host}${path}`;
 }
 
 function isLoopback(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^[\[]|[\]]$/g, '');
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (host === 'localhost' || host === '::1') {
     return true;
   }
@@ -41,7 +43,7 @@ function ipv4(host: string): [number, number, number, number] | null {
 }
 
 function isBlockedHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^[\[]|[\]]$/g, '');
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
   if (host === 'metadata.google.internal' || host.endsWith('.metadata.google.internal')) {
     return true;
   }
@@ -53,19 +55,9 @@ function isBlockedHost(hostname: string): boolean {
     return false;
   }
   const [a, b] = ip;
-  if (a === 0 || a === 10) {
-    return true;
-  }
-  if (a === 169 && b === 254) {
-    return true;
-  }
-  if (a === 172 && b >= 16 && b <= 31) {
-    return true;
-  }
-  if (a === 192 && b === 168) {
-    return true;
-  }
-  if (a === 100 && b >= 64 && b <= 127) {
+  // 0.0.0.0/8 and link-local are never a model gateway.
+  // Private and carrier-grade ranges are decided by the server admin allowlist.
+  if (a === 0 || (a === 169 && b === 254)) {
     return true;
   }
   return false;
