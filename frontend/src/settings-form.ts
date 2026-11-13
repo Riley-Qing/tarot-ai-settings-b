@@ -5,7 +5,7 @@ import type {
   AiSettingsSnapshot,
   AiTestRequest
 } from './types';
-import { normalizeBaseUrl, parseTimeout, validateBaseUrl } from './validate';
+import { normalizeBaseUrl, parseTimeout, validateBaseUrl, type BaseUrlResult } from './validate';
 
 export interface SettingsDraft {
   mode: AiSettings['mode'];
@@ -37,7 +37,8 @@ const FALLBACK: Record<string, string> = {
   AI_BAD_RESPONSE: 'The AI server returned a response this page could not use. The card was not changed.',
   STORAGE_ERROR: 'Settings could not be saved. The previous configuration is unchanged.',
   INTERNAL_ERROR: 'Something went wrong. Try again.',
-  SESSION_EXPIRED: 'Could not reach Tarot. Check your Jupyter session and try again.'
+  SESSION_EXPIRED: 'Could not reach Tarot. Check your Jupyter session and try again.',
+  NETWORK_ERROR: 'Could not reach Tarot. Check the network and try again. The card was not changed.'
 };
 
 export function draftFromSnapshot(snapshot: AiSettingsSnapshot): SettingsDraft {
@@ -91,16 +92,26 @@ export function isDirty(draft: SettingsDraft, snapshot: AiSettingsSnapshot): boo
 }
 
 export function urlChangedWithStoredKey(draft: SettingsDraft, snapshot: AiSettingsSnapshot): boolean {
-  if (!snapshot.key_present || snapshot.key_source === 'none') {
+  if (isFieldLocked(snapshot, 'base_url') || !snapshot.key_present || snapshot.key_source === 'none') {
     return false;
   }
   return normalizeBaseUrl(draft.baseUrl) !== normalizeBaseUrl(snapshot.settings.base_url);
 }
 
+function resolveBaseUrl(draft: SettingsDraft, snapshot: AiSettingsSnapshot): BaseUrlResult {
+  if (isFieldLocked(snapshot, 'base_url')) {
+    return { ok: true, normalized: snapshot.settings.base_url };
+  }
+  if (draft.mode === 'demo' && draft.baseUrl.trim() === '') {
+    return { ok: true, normalized: '' };
+  }
+  return validateBaseUrl(draft.baseUrl);
+}
+
 export function validateDraft(draft: SettingsDraft, snapshot: AiSettingsSnapshot): FieldErrors {
   const errors: FieldErrors = {};
   if (!isFieldLocked(snapshot, 'base_url')) {
-    const base = validateBaseUrl(draft.baseUrl);
+    const base = resolveBaseUrl(draft, snapshot);
     if (!base.ok) {
       errors.base_url = base.message;
     }
@@ -120,6 +131,15 @@ export function validateDraft(draft: SettingsDraft, snapshot: AiSettingsSnapshot
   if (draft.clearRuntimeKey && snapshot.key_source === 'environment') {
     errors.api_key = 'An environment key cannot be cleared from this page.';
   }
+  if (
+    !errors.api_key &&
+    draft.mode !== 'demo' &&
+    urlChangedWithStoredKey(draft, snapshot) &&
+    draft.authMode !== 'none' &&
+    draft.apiKeyInput.trim() === ''
+  ) {
+    errors.api_key = 'Enter a new API key for this server, or choose No authentication.';
+  }
   return errors;
 }
 
@@ -127,9 +147,7 @@ export function settingsFromDraft(draft: SettingsDraft, snapshot: AiSettingsSnap
   const timeout = isFieldLocked(snapshot, 'timeout_seconds')
     ? snapshot.settings.timeout_seconds
     : parseTimeout(draft.timeoutText);
-  const base = isFieldLocked(snapshot, 'base_url')
-    ? { ok: true as const, normalized: snapshot.settings.base_url }
-    : validateBaseUrl(draft.baseUrl);
+  const base = resolveBaseUrl(draft, snapshot);
   if (timeout === null || !base.ok) {
     return null;
   }
