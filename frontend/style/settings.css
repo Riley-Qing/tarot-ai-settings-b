@@ -1,0 +1,94 @@
+.tarot-settings-host {
+  color: var(--jp-ui-font-color1);
+  background: var(--jp-layout-color1);
+}
+
+.tarot-settings {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  overflow: auto;
+  font-size: var(--jp-ui-font-size1);
+}
+
+.tarot-settings h2 {
+  margin: 0;
+  font-size: var(--jp-ui-font-size2);
+}
+
+.tarot-settings form,
+.tarot-settings fieldset,
+.tarot-settings-actions,
+.tarot-settings-choice,
+.tarot-settings-key {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tarot-settings fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.tarot-settings label {
+  display: grid;
+  gap: 4px;
+}
+
+.tarot-settings input,
+.tarot-settings select,
+.tarot-settings button {
+  font: inherit;
+  color: var(--jp-ui-font-color1);
+  background: var(--jp-input-background, var(--jp-layout-color2));
+  border: 1px solid var(--jp-border-color2);
+  border-radius: 2px;
+  min-height: 28px;
+  max-width: 100%;
+}
+
+.tarot-settings button {
+  padding: 4px 8px;
+}
+
+.tarot-settings input:focus,
+.tarot-settings select:focus,
+.tarot-settings button:focus {
+  outline: 2px solid var(--jp-brand-color1, var(--jp-border-color0));
+  outline-offset: 1px;
+}
+
+.tarot-settings-key {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.tarot-settings-actions {
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+}
+
+.tarot-settings-hint,
+.tarot-settings-error,
+.tarot-settings p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tarot-settings-hint {
+  color: var(--jp-ui-font-color2);
+}
+
+.tarot-settings-error:empty {
+  display: none;
+}
+
+.tarot-settings-error {
+  color: var(--jp-error-color1, #c0392b);
+}
+
+.tarot-settings [aria-invalid="true"] {
+  border-color: var(--jp-error-color1, #c0392b);
+}
