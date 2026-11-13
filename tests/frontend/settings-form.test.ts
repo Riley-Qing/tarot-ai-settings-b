@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   buildSaveBody,
@@ -12,7 +15,9 @@ import {
   validateDraft
 } from '../../frontend/src/settings-form.ts';
 import type { AiSettingsSnapshot } from '../../frontend/src/types.ts';
-import { parseTimeout, validateBaseUrl } from '../../frontend/src/validate.ts';
+import { normalizeBaseUrl, parseTimeout, validateBaseUrl } from '../../frontend/src/validate.ts';
+
+const fixtures = join(dirname(fileURLToPath(import.meta.url)), '../fixtures');
 
 function snapshot(patch: Partial<AiSettingsSnapshot> = {}): AiSettingsSnapshot {
   return {
@@ -32,17 +37,21 @@ function snapshot(patch: Partial<AiSettingsSnapshot> = {}): AiSettingsSnapshot {
   };
 }
 
-test('base URL rejects secrets, query, fragment, completions and private hosts', () => {
+test('base URL rejects secrets, query, fragment, completions, metadata and non-loopback HTTP', () => {
   assert.equal(validateBaseUrl('https://api.openai.com/v1/').ok, true);
   assert.equal(validateBaseUrl('https://user:secret@api.openai.com/v1').ok, false);
   assert.equal(validateBaseUrl('https://api.openai.com/v1?key=1').ok, false);
   assert.equal(validateBaseUrl('https://api.openai.com/v1#frag').ok, false);
   assert.equal(validateBaseUrl('https://api.openai.com/v1/chat/completions').ok, false);
   assert.equal(validateBaseUrl('http://192.168.1.8/v1').ok, false);
+  assert.equal(validateBaseUrl('https://192.168.1.8/v1').ok, true);
+  assert.equal(validateBaseUrl('https://10.1.2.3/v1').ok, true);
   assert.equal(validateBaseUrl('http://169.254.169.254/').ok, false);
+  assert.equal(validateBaseUrl('https://metadata.google.internal/').ok, false);
   assert.equal(validateBaseUrl('http://127.0.0.1:8000/v1').ok, true);
   const normalized = validateBaseUrl('https://api.openai.com/v1/');
   assert.equal(normalized.ok && normalized.normalized, 'https://api.openai.com/v1');
+  assert.equal(normalizeBaseUrl('https://api.openai.com/'), 'https://api.openai.com');
 });
 
 test('timeout accepts only whole seconds from 5 to 120', () => {
@@ -91,21 +100,33 @@ test('replace and clear together is rejected', () => {
   assert.equal(buildSaveBody(draft, saved), null);
 });
 
-test('changing the server does not keep the old key label', () => {
+test('changing the server requires a new key or no authentication', () => {
   const saved = snapshot();
   const draft = draftFromSnapshot(saved);
   draft.baseUrl = 'https://example.test/v1';
   assert.match(keyLabel(saved, draft), /Not set for this server/);
-  assert.equal(buildSaveBody(draft, saved)?.api_key, undefined);
+  assert.match(validateDraft(draft, saved).api_key ?? '', /new API key/);
+  assert.equal(buildSaveBody(draft, saved), null);
+  draft.authMode = 'none';
+  assert.equal(validateDraft(draft, saved).api_key, undefined);
+  const body = buildSaveBody(draft, saved);
+  assert.equal(body?.api_key, undefined);
+  assert.equal(body?.settings.auth_mode, 'none');
+  assert.equal(body?.settings.base_url, 'https://example.test/v1');
 });
 
-test('demo mode builds no test request', () => {
+test('demo mode can be saved without a server and builds no test request', () => {
   const saved = snapshot();
   const draft = draftFromSnapshot(saved);
   draft.mode = 'demo';
+  draft.baseUrl = '';
+  draft.model = '';
+  assert.equal(validateDraft(draft, saved).base_url, undefined);
+  assert.equal(validateDraft(draft, saved).model, undefined);
   assert.equal(buildTestBody(draft, saved), null);
   const save = buildSaveBody(draft, saved);
   assert.equal(save?.settings.mode, 'demo');
+  assert.equal(save?.settings.base_url, '');
 });
 
 test('any field change produces a new stamp and a dirty draft', () => {
@@ -140,4 +161,36 @@ test('an environment key cannot be cleared and locked fields stay unchanged', ()
   draft.clearRuntimeKey = false;
   const body = buildSaveBody(draft, saved);
   assert.equal(body?.settings.base_url, 'https://api.openai.com/v1');
+});
+
+test('fixtures cover the read snapshot, a 409 conflict and a passing test', () => {
+  const read = JSON.parse(readFileSync(join(fixtures, 'ai-settings-read.json'), 'utf8')) as AiSettingsSnapshot;
+  const draft = draftFromSnapshot(read);
+  assert.equal(isDirty(draft, read), false);
+  assert.match(keyLabel(read, draft), /Not set/);
+  assert.equal(read.status, 'not_configured');
+
+  const conflict = JSON.parse(readFileSync(join(fixtures, 'ai-settings-save-conflict.json'), 'utf8')) as {
+    error: { code: string; message: string };
+  };
+  const conflictError = new Error(conflict.error.message);
+  Object.assign(conflictError, { status: 409, code: conflict.error.code });
+  assert.equal(conflict.error.code, 'CONFIG_CONFLICT');
+  assert.match(messageForError(conflictError), /draft is kept/);
+
+  const passed = JSON.parse(readFileSync(join(fixtures, 'ai-test-ok.json'), 'utf8')) as {
+    ok: boolean;
+    latency_ms: number;
+    message: string;
+  };
+  assert.equal(passed.ok, true);
+  assert.equal(typeof passed.latency_ms, 'number');
+  assert.match(passed.message, /test prompt/);
+});
+
+test('a dropped network call is not reported as an expired Jupyter session', () => {
+  const dropped = new Error('Could not reach Tarot. Check the network and try again.');
+  Object.assign(dropped, { status: 0, code: 'NETWORK_ERROR' });
+  assert.match(messageForError(dropped), /network/i);
+  assert.doesNotMatch(messageForError(dropped), /Jupyter session/);
 });
